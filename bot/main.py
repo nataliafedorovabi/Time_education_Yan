@@ -1,4 +1,3 @@
-import asyncio
 import os
 from io import BytesIO
 from typing import Dict, Any
@@ -29,7 +28,6 @@ async def _send_question(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     level = int(user_data.get("level", DEFAULT_LEVEL))
     q = generate_question(level)
 
-    # Build image bytes
     if q.render_type == "time_of_day":
         image_bytes = render_time_of_day_card(q.render_params.get("label", ""))
     elif q.render_type == "text_card":
@@ -39,13 +37,11 @@ async def _send_question(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             int(q.render_params.get("hour", 12)), int(q.render_params.get("minute", 0))
         )
 
-    # Build keyboard
     keyboard = [[InlineKeyboardButton(text=c.capitalize(), callback_data=f"ans::{c}")] for c in q.choices]
     markup = InlineKeyboardMarkup(keyboard)
 
     user_data["current_correct"] = q.correct
 
-    # Send image + caption
     if update.effective_chat is not None:
         await context.bot.send_photo(
             chat_id=update.effective_chat.id,
@@ -72,7 +68,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         f"Начнём с простого. Можешь в любой момент сменить уровень: /level 1..5.\n"
         f"Голосовую озвучку можно включить командой /voice."
     )
-    await update.message.reply_text(greeting)
+    if update.message is not None:
+        await update.message.reply_text(greeting)
     await _send_question(update, context)
 
 
@@ -83,7 +80,8 @@ async def help_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         "/level 1..5 — выбрать уровень сложности\n"
         "/voice — включить/выключить голосовую озвучку"
     )
-    await update.message.reply_text(text)
+    if update.message is not None:
+        await update.message.reply_text(text)
 
 
 async def level_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -93,11 +91,14 @@ async def level_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             level = int(context.args[0])
             level = max(1, min(5, level))
             context.user_data["level"] = level
-            await update.message.reply_text(f"Уровень установлен: {level}")
+            if update.message is not None:
+                await update.message.reply_text(f"Уровень установлен: {level}")
         except ValueError:
-            await update.message.reply_text("Укажи уровень числом от 1 до 5, например: /level 3")
+            if update.message is not None:
+                await update.message.reply_text("Укажи уровень числом от 1 до 5, например: /level 3")
     else:
-        await update.message.reply_text(f"Текущий уровень: {context.user_data.get('level', DEFAULT_LEVEL)}. Укажи: /level 1..5")
+        if update.message is not None:
+            await update.message.reply_text(f"Текущий уровень: {context.user_data.get('level', DEFAULT_LEVEL)}. Укажи: /level 1..5")
     await _send_question(update, context)
 
 
@@ -105,7 +106,8 @@ async def voice_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     _ensure_user_defaults(context.user_data)
     context.user_data["voice_enabled"] = not context.user_data.get("voice_enabled")
     state = "включена" if context.user_data["voice_enabled"] else "выключена"
-    await update.message.reply_text(f"Голосовая озвучка {state}.")
+    if update.message is not None:
+        await update.message.reply_text(f"Голосовая озвучка {state}.")
     await _send_question(update, context)
 
 
@@ -120,24 +122,17 @@ async def on_answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     correct = user_data.get("current_correct")
 
     data = query.data or ""
-    if data.startswith("ans::"):
-        chosen = data.split("::", 1)[1]
-    else:
-        chosen = data
+    chosen = data.split("::", 1)[1] if data.startswith("ans::") else data
 
-    if chosen == correct:
-        feedback = "Верно! Молодец!"
-    else:
-        feedback = f"Пока нет. Правильный ответ: {correct}."
+    feedback = "Верно! Молодец!" if chosen == correct else f"Пока нет. Правильный ответ: {correct}."
 
-    await query.edit_message_caption(caption=f"{query.message.caption}\n\n{feedback}")
+    if query.message is not None and query.message.caption:
+        await query.edit_message_caption(caption=f"{query.message.caption}\n\n{feedback}")
 
-    # Next question
-    fake_update = Update(update.update_id, message=query.message)
-    await _send_question(fake_update, context)
+    await _send_question(Update(update.update_id, message=query.message), context)
 
 
-async def main() -> None:
+def run() -> None:
     load_dotenv()
     token = os.getenv("TELEGRAM_BOT_TOKEN")
     if not token:
@@ -149,11 +144,10 @@ async def main() -> None:
     app.add_handler(CommandHandler("help", help_cmd))
     app.add_handler(CommandHandler("level", level_cmd))
     app.add_handler(CommandHandler("voice", voice_cmd))
-
     app.add_handler(CallbackQueryHandler(on_answer))
 
-    await app.run_polling()
+    app.run_polling(close_loop=False)
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    run()

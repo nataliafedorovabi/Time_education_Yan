@@ -8,19 +8,18 @@ from PIL import Image, ImageDraw, ImageFont
 
 def _pick_bright_color() -> Tuple[int, int, int]:
     palette = [
-        (255, 231, 150),  # warm yellow
-        (176, 232, 255),  # sky blue
-        (200, 255, 200),  # mint
-        (255, 200, 220),  # pink
-        (255, 220, 180),  # peach
-        (210, 210, 255),  # lilac
+        (255, 231, 150),
+        (176, 232, 255),
+        (200, 255, 200),
+        (255, 200, 220),
+        (255, 220, 180),
+        (210, 210, 255),
     ]
     return random.choice(palette)
 
 
 def _load_font(size: int) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
     try:
-        # If user adds a TTF named DejaVuSans.ttf next to the script, we try it
         return ImageFont.truetype("DejaVuSans.ttf", size=size)
     except Exception:
         return ImageFont.load_default()
@@ -37,31 +36,25 @@ def render_time_of_day_card(label: str, size: Tuple[int, int] = (800, 600)) -> b
     bg = _pick_bright_color()
     image = Image.new("RGB", size, bg)
     draw = ImageDraw.Draw(image)
-
-    # Simple symbolic illustration
     cx, cy = size[0] // 2, size[1] // 2
     big_font = _load_font(64)
     small_font = _load_font(36)
 
-    # Decorative circle and icon-like shape
     radius = min(size) // 5
     draw.ellipse((cx - radius, cy - radius, cx + radius, cy + radius), outline=(0, 0, 0), width=6)
 
     if label == "утро":
         draw.arc((cx - radius, cy - radius, cx + radius, cy + radius), start=200, end=340, fill=(255, 200, 0), width=12)
-        _draw_centered_text(draw, "СОЛНЦЕ", (cx, cy + radius + 40), small_font, fill=(120, 90, 0))
     elif label == "день":
         draw.ellipse((cx - 30, cy - 30, cx + 30, cy + 30), fill=(255, 215, 0))
-        _draw_centered_text(draw, "ЯРКО", (cx, cy + radius + 40), small_font, fill=(120, 90, 0))
     elif label == "вечер":
         draw.rectangle((cx - radius, cy - 10, cx + radius, cy + 10), fill=(255, 120, 0))
-        _draw_centered_text(draw, "ТЕПЛО", (cx, cy + radius + 40), small_font, fill=(120, 60, 0))
-    else:  # ночь
+    else:
         draw.rectangle((cx - radius, cy - radius, cx + radius, cy + radius), outline=(40, 40, 80), width=6)
         draw.ellipse((cx - 15, cy - 15, cx + 15, cy + 15), fill=(200, 200, 255))
-        _draw_centered_text(draw, "ТИХО", (cx, cy + radius + 40), small_font, fill=(30, 30, 90))
 
     _draw_centered_text(draw, label.upper(), (cx, int(size[1] * 0.18)), big_font)
+    _draw_centered_text(draw, "Выбери ответ", (cx, cy + radius + 40), small_font)
 
     buf = BytesIO()
     image.save(buf, format="PNG")
@@ -95,10 +88,8 @@ def render_clock(hour: int, minute: int, size: Tuple[int, int] = (800, 800)) -> 
     center = (size[0] // 2, size[1] // 2)
     radius = int(min(size) * 0.4)
 
-    # Face
     draw.ellipse((center[0] - radius, center[1] - radius, center[0] + radius, center[1] + radius), outline=(0, 0, 0), width=8, fill=(255, 255, 255))
 
-    # Hour marks
     mark_font = _load_font(36)
     for h in range(1, 13):
         angle = (h % 12) * (2 * math.pi / 12) - math.pi / 2
@@ -106,7 +97,6 @@ def render_clock(hour: int, minute: int, size: Tuple[int, int] = (800, 800)) -> 
         ty = int(center[1] + math.sin(angle) * (radius - 40))
         _draw_centered_text(draw, str(h), (tx, ty), mark_font)
 
-    # Hands
     minute_angle = (minute / 60.0) * 2 * math.pi - math.pi / 2
     hour_angle = ((hour % 12) / 12.0 + (minute / 60.0) / 12.0) * 2 * math.pi - math.pi / 2
 
@@ -122,7 +112,6 @@ def render_clock(hour: int, minute: int, size: Tuple[int, int] = (800, 800)) -> 
     draw.line((center[0], center[1], hx, hy), fill=(0, 0, 0), width=12)
     draw.ellipse((center[0] - 8, center[1] - 8, center[0] + 8, center[1] + 8), fill=(0, 0, 0))
 
-    # Caption
     caption_font = _load_font(48)
     _draw_centered_text(draw, f"{hour}:{minute:02d}", (center[0], int(size[1] * 0.9)), caption_font, fill=(20, 20, 20))
 
